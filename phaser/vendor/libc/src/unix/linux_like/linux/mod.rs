@@ -563,6 +563,24 @@ s! {
         pub instruction_pointer: ::__u64,
         pub args: [::__u64; 6],
     }
+
+    pub struct nlmsghdr {
+        pub nlmsg_len: u32,
+        pub nlmsg_type: u16,
+        pub nlmsg_flags: u16,
+        pub nlmsg_seq: u32,
+        pub nlmsg_pid: u32,
+    }
+
+    pub struct nlmsgerr {
+        pub error: ::c_int,
+        pub msg: nlmsghdr,
+    }
+
+    pub struct nlattr {
+        pub nla_len: u16,
+        pub nla_type: u16,
+    }
 }
 
 s_no_extra_traits! {
@@ -1598,6 +1616,7 @@ cfg_if! {
 
 pub const MREMAP_MAYMOVE: ::c_int = 1;
 pub const MREMAP_FIXED: ::c_int = 2;
+pub const MREMAP_DONTUNMAP: ::c_int = 4;
 
 pub const PR_SET_PDEATHSIG: ::c_int = 1;
 pub const PR_GET_PDEATHSIG: ::c_int = 2;
@@ -3036,8 +3055,16 @@ pub const SOL_CAN_BASE: ::c_int = 100;
 pub const CAN_INV_FILTER: canid_t = 0x20000000;
 pub const CAN_RAW_FILTER_MAX: ::c_int = 512;
 
+#[deprecated(
+    since = "0.2.102",
+    note = "Errnoeously uses c_int; should use c_short."
+)]
 #[cfg(not(any(target_arch = "sparc", target_arch = "sparc64")))]
 pub const POLLRDHUP: ::c_int = 0x2000;
+#[deprecated(
+    since = "0.2.102",
+    note = "Errnoeously uses c_int; should use c_short."
+)]
 #[cfg(any(target_arch = "sparc", target_arch = "sparc64"))]
 pub const POLLRDHUP: ::c_int = 0x800;
 
@@ -3428,6 +3455,16 @@ extern "C" {
         addr: *mut ::sockaddr,
         len: *mut ::socklen_t,
         flg: ::c_int,
+    ) -> ::c_int;
+    pub fn pthread_getaffinity_np(
+        thread: ::pthread_t,
+        cpusetsize: ::size_t,
+        cpuset: *mut ::cpu_set_t,
+    ) -> ::c_int;
+    pub fn pthread_setaffinity_np(
+        thread: ::pthread_t,
+        cpusetsize: ::size_t,
+        cpuset: *const ::cpu_set_t,
     ) -> ::c_int;
     pub fn pthread_setschedprio(native: ::pthread_t, priority: ::c_int) -> ::c_int;
     pub fn reboot(how_to: ::c_int) -> ::c_int;
@@ -3837,6 +3874,17 @@ extern "C" {
         new_value: *const ::itimerspec,
         old_value: *mut ::itimerspec,
     ) -> ::c_int;
+
+    pub fn gethostid() -> ::c_long;
+
+    pub fn pthread_getcpuclockid(thread: ::pthread_t, clk_id: *mut ::clockid_t) -> ::c_int;
+    pub fn memmem(
+        haystack: *const ::c_void,
+        haystacklen: ::size_t,
+        needle: *const ::c_void,
+        needlelen: ::size_t,
+    ) -> *mut ::c_void;
+    pub fn sched_getcpu() -> ::c_int;
 }
 
 cfg_if! {

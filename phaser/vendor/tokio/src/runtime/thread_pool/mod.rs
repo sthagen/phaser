@@ -12,8 +12,9 @@ pub(crate) use worker::Launch;
 pub(crate) use worker::block_in_place;
 
 use crate::loom::sync::Arc;
+use crate::runtime::stats::RuntimeStats;
 use crate::runtime::task::JoinHandle;
-use crate::runtime::Parker;
+use crate::runtime::{Callback, Parker};
 
 use std::fmt;
 use std::future::Future;
@@ -43,8 +44,13 @@ pub(crate) struct Spawner {
 // ===== impl ThreadPool =====
 
 impl ThreadPool {
-    pub(crate) fn new(size: usize, parker: Parker) -> (ThreadPool, Launch) {
-        let (shared, launch) = worker::create(size, parker);
+    pub(crate) fn new(
+        size: usize,
+        parker: Parker,
+        before_park: Option<Callback>,
+        after_unpark: Option<Callback>,
+    ) -> (ThreadPool, Launch) {
+        let (shared, launch) = worker::create(size, parker, before_park, after_unpark);
         let spawner = Spawner { shared };
         let thread_pool = ThreadPool { spawner };
 
@@ -98,6 +104,10 @@ impl Spawner {
 
     pub(crate) fn shutdown(&mut self) {
         self.shared.close();
+    }
+
+    pub(crate) fn stats(&self) -> &RuntimeStats {
+        self.shared.stats()
     }
 }
 

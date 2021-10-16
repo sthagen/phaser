@@ -3,6 +3,7 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicU16, AtomicU32};
 use crate::loom::sync::Arc;
+use crate::runtime::stats::WorkerStatsBatcher;
 use crate::runtime::task::{self, Inject};
 
 use std::mem::MaybeUninit;
@@ -89,6 +90,14 @@ pub(super) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
 impl<T> Local<T> {
     /// Returns true if the queue has entries that can be stealed.
     pub(super) fn is_stealable(&self) -> bool {
+        !self.inner.is_empty()
+    }
+
+    /// Returns false if there are any entries in the queue
+    ///
+    /// Separate to is_stealable so that refactors of is_stealable to "protect"
+    /// some tasks from stealing won't affect this
+    pub(super) fn has_tasks(&self) -> bool {
         !self.inner.is_empty()
     }
 
@@ -288,7 +297,11 @@ impl<T> Steal<T> {
     }
 
     /// Steals half the tasks from self and place them into `dst`.
-    pub(super) fn steal_into(&self, dst: &mut Local<T>) -> Option<task::Notified<T>> {
+    pub(super) fn steal_into(
+        &self,
+        dst: &mut Local<T>,
+        stats: &mut WorkerStatsBatcher,
+    ) -> Option<task::Notified<T>> {
         // Safety: the caller is the only thread that mutates `dst.tail` and
         // holds a mutable reference.
         let dst_tail = unsafe { dst.inner.tail.unsync_load() };
@@ -307,6 +320,7 @@ impl<T> Steal<T> {
         // Steal the tasks into `dst`'s buffer. This does not yet expose the
         // tasks in `dst`.
         let mut n = self.steal_into2(dst, dst_tail);
+        stats.incr_steal_count(n);
 
         if n == 0 {
             // No tasks were stolen
